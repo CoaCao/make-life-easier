@@ -2,6 +2,7 @@ import streamlit as st
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration, WebRtcMode
 import av
 import easyocr
+import numpy as np
 
 
 st.set_page_config(page_title="OCR Camera App", layout="centered", page_icon="🦈")
