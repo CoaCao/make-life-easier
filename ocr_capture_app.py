@@ -1,9 +1,9 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="OCR Mobile Camera", layout="centered")
+st.set_page_config(page_title="OCR Camera App", layout="centered")
 
-st.title("📱 OCR bằng Tesseract.js")
+st.title("📷 OCR Camera - English & Japanese")
 
 components.html("""
 <!DOCTYPE html>
@@ -53,8 +53,8 @@ components.html("""
   </head>
   <body>
     <video id="video" autoplay playsinline></video><br/>
-    <button onclick="captureAndRecognize()">📸 Chụp & OCR</button>
-    <textarea id="output" placeholder="Kết quả sẽ hiển thị ở đây..."></textarea>
+    <button onclick="captureAndRecognize()">📸 Capture & OCR</button>
+    <textarea id="output" placeholder="Text will appear here..."></textarea>
     <canvas id="canvas"></canvas>
 
     <script>
@@ -75,7 +75,7 @@ components.html("""
           video.srcObject = stream;
         })
         .catch(err => {
-          alert("🚫 Không thể mở camera. Vui lòng kiểm tra quyền truy cập.");
+          alert("🚫 Unable to access camera. Please check permissions.");
           console.error(err);
         });
 
@@ -85,13 +85,13 @@ components.html("""
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        Tesseract.recognize(canvas, 'eng', {
+        Tesseract.recognize(canvas, 'eng+jpn', {
           logger: m => console.log(m)
         }).then(({ data: { text } }) => {
           output.value = text.trim();
         }).catch(err => {
-          console.error("Lỗi OCR:", err);
-          output.value = "❌ Lỗi khi nhận dạng văn bản.";
+          console.error("OCR error:", err);
+          output.value = "❌ OCR error.";
         });
       }
     </script>
