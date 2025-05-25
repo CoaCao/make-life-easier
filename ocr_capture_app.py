@@ -1,64 +1,61 @@
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration, WebRtcMode
+from streamlit_webrtc import webrtc_streamer
 import av
-import easyocr
+import cv2
 import numpy as np
+import easyocr
+
+# Cấu hình page (phải là dòng đầu tiên)
+st.set_page_config(page_title="OCR Camera App", layout="centered", page_icon="📷")
+
+st.title("📷 OCR Camera App")
+
+# Tạo OCR reader một lần
+reader = easyocr.Reader(["en", "vi"], gpu=False)
+
+# Dùng biến session_state để lưu frame hiện tại
+if "current_frame" not in st.session_state:
+    st.session_state.current_frame = None
+if "ocr_text" not in st.session_state:
+    st.session_state.ocr_text = ""
 
 
-st.set_page_config(page_title="OCR Camera App", layout="centered", page_icon="🦈")
-
-# Cấu hình WebRTC (dùng STUN server miễn phí của Google)
-RTC_CONFIGURATION = RTCConfiguration(
-    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
-)
-
-# OCR Reader (chỉ khởi tạo 1 lần)
-@st.cache_resource
-def load_reader():
-    return easyocr.Reader(["en", "ja"], gpu=False)
-
-reader = load_reader()
-
-# Xử lý khung hình video
-class VideoProcessor(VideoProcessorBase):
+# Xử lý video frame
+# Lưu frame vào processor (được thread-safe hơn)
+class VideoProcessor:
     def __init__(self):
-        self.frame = None
+        self.latest_frame = None
 
-    def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
+    def recv(self, frame):
         img = frame.to_ndarray(format="bgr24")
-        self.frame = img
+        self.latest_frame = img
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 
-# Giao diện Streamlit
-st.title("📷 Camera OCR - Trích xuất văn bản từ hình ảnh")
-
-# Khởi tạo camera
-ctx = webrtc_streamer(
+# Cấu hình WebRTC
+webrtc_ctx = webrtc_streamer(
     key="ocr-capture",
-    mode=WebRtcMode.SENDRECV,
-    rtc_configuration=RTC_CONFIGURATION,
     video_processor_factory=VideoProcessor,
-    media_stream_constraints={
-        "video": {"facingMode": "environment"},  # camera sau trên mobile
-        "audio": False,
-    },
+    media_stream_constraints={"video": True, "audio": False},
     async_processing=True,
 )
 
-# Giao diện OCR
-st.markdown("---")
-if ctx.video_processor:
-    if st.button("📸 Capture & OCR"):
-        frame = ctx.video_processor.frame
-        if frame is not None:
-            with st.spinner("🔍 Đang nhận dạng văn bản..."):
-                result = reader.readtext(frame)
-                text = "\n".join([item[1] for item in result])
-                st.success("✅ Nhận dạng hoàn tất!")
-                st.text_area("📄 Văn bản trích xuất:", text, height=200)
-        else:
-            st.warning("❌ Không tìm thấy khung hình từ camera.")
-else:
-    st.info("📡 Đang khởi tạo camera... Vui lòng cấp quyền truy cập.")
+# Nút Capture
+if st.button("📸 Capture & OCR"):
+    if webrtc_ctx.video_processor:
+        frame = webrtc_ctx.video_processor.latest_frame
+    else:
+        frame = None
 
+    if frame is not None:
+        with st.spinner("🔍 Đang nhận diện văn bản..."):
+            resized = cv2.resize(frame, (640, 480))
+            results = reader.readtext(resized)
+            extracted_text = "\n".join([res[1] for res in results])
+            st.session_state.ocr_text = extracted_text
+    else:
+        st.warning("⚠️ Không lấy được hình ảnh từ camera. Hãy thử lại.")
+
+
+# Hiển thị kết quả
+st.text_area("📄 Kết quả trích xuất văn bản:", st.session_state.ocr_text, height=300)
