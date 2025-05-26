@@ -2,7 +2,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="OCR Camera App", layout="centered")
-
 st.title("📷 OCR Camera - English")
 
 components.html("""
