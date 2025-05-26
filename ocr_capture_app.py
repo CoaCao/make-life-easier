@@ -19,12 +19,13 @@ components.html("""
 
     video, canvas {
       width: 100%;
-      max-width: 640px;
+      max-width: 800px;
       height: auto;
       border-radius: 8px;
       margin: 0 auto;
       display: block;
     }
+    
 
     #result {
       margin-top: 12px;
