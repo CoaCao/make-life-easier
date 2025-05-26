@@ -119,8 +119,8 @@ components.html("""
 
 
     function captureAndRecognize() {
-      const width = 640;
-      const height = 480;
+      const width = 800;
+      const height = 600;
       canvas.width = width;
       canvas.height = height;
 
