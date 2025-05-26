@@ -95,6 +95,8 @@ components.html("""
         logger: m => console.log(m),
         tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,:;!?()[]{}-_=+'
       }).then(({ data: { text } }) => {
+        // ✅ Filter get latin text
+        const cleanedText = text.replace(/[^A-Za-z0-9 .,;:!?()\[\]{}\-_=+]/g, '');
         resultBox.textContent = text || "No text found.";
       }).catch(err => {
         resultBox.textContent = "Error recognizing text.";
