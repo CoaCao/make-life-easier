@@ -134,7 +134,7 @@ components.html("""
         const cleaned = text.replace(/[^A-Za-z0-9 /\\:\\-]/g, '');
         const expiry = extractExpiry(cleaned);
         
-        resultBox.textContent = expiry &&  ? expiry != "" `✅ Found: ${expiry}` : "❌ No expiry date found.";
+        resultBox.textContent = expiry && expiry != "" ? `✅ Found: ${expiry}` : "❌ No expiry date found.";
       }).catch(err => {
         resultBox.textContent = "Error recognizing text.";
         console.error(err);
