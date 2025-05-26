@@ -6,94 +6,103 @@ st.title("📷 OCR Camera - English")
 
 components.html("""
 <!DOCTYPE html>
-<html>
-  <head>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-      body {
-        font-family: sans-serif;
-        text-align: center;
-        margin: 0;
-        padding: 0;
-      }
-      video {
-        width: 100%;
-        max-width: 400px;
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Client-side OCR</title>
+  <style>
+    video, canvas {
+      width: 100%;
+      max-width: 800px;
+      border-radius: 8px;
+    }
+
+    #result {
+      margin-top: 12px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      white-space: pre-wrap;
+      background: #f0f0f0;
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 768px) {
+      video, canvas {
         height: auto;
-        aspect-ratio: 4 / 3;
-        border: 2px solid #ccc;
-        border-radius: 12px;
       }
-      button {
-        margin-top: 12px;
-        padding: 10px 20px;
-        font-size: 1rem;
-        border-radius: 8px;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
+    }
+  </style>
+</head>
+<body>
+  <h2>📷 OCR via Tesseract.js (English only)</h2>
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <br />
+  <button onclick="captureAndRecognize()">🔍 Capture & Recognize</button>
+  <div id="result">OCR result will appear here...</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const resultBox = document.getElementById("result");
+
+    // Open rear camera by default if on mobile
+    const constraints = {
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 800 },
+        height: { ideal: 600 }
       }
-      textarea {
-        width: 100%;
-        max-width: 400px;
-        height: 120px;
-        margin-top: 14px;
-        padding: 10px;
-        font-size: 1rem;
-        border-radius: 8px;
-        border: 1px solid #999;
-        resize: none;
+    };
+
+    navigator.mediaDevices.getUserMedia(constraints)
+      .then(stream => {
+        video.srcObject = stream;
+      })
+      .catch(err => {
+        console.error("Camera error:", err);
+        alert("Cannot access camera.");
+      });
+
+    function preprocessImage(ctx, width, height) {
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        const thresh = avg > 140 ? 255 : 0; // Binary threshold
+        data[i] = data[i + 1] = data[i + 2] = thresh;
       }
-      canvas {
-        display: none;
-      }
-    </style>
-  </head>
-  <body>
-    <video id="video" autoplay playsinline></video><br/>
-    <button onclick="captureAndRecognize()">📸 Capture & OCR</button>
-    <textarea id="output" placeholder="Text will appear here..."></textarea>
-    <canvas id="canvas"></canvas>
+      ctx.putImageData(imageData, 0, 0);
+    }
 
-    <script>
-      const video = document.getElementById('video');
-      const canvas = document.getElementById('canvas');
-      const output = document.getElementById('output');
+    function captureAndRecognize() {
+      const width = 800;
+      const height = 600;
+      canvas.width = width;
+      canvas.height = height;
 
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      ctx.drawImage(video, 0, 0, width, height);
+      preprocessImage(ctx, width, height);
 
-      const constraints = {
-        video: {
-          facingMode: isMobile ? { exact: "environment" } : "user"
-        }
-      };
+      resultBox.textContent = "⏳ Processing...";
 
-      navigator.mediaDevices.getUserMedia(constraints)
-        .then(stream => {
-          video.srcObject = stream;
-        })
-        .catch(err => {
-          alert("🚫 Unable to access camera. Please check permissions.");
-          console.error(err);
-        });
-
-      function captureAndRecognize() {
-        const ctx = canvas.getContext('2d');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        Tesseract.recognize(canvas, 'eng', {
-          logger: m => console.log(m)
-        }).then(({ data: { text } }) => {
-          output.value = text.trim();
-        }).catch(err => {
-          console.error("OCR error:", err);
-          output.value = "❌ OCR error.";
-        });
-      }
-    </script>
-  </body>
+      Tesseract.recognize(canvas, 'eng', {
+        logger: m => console.log(m),
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,:;!?()[]{}-_=+'
+      }).then(({ data: { text } }) => {
+        resultBox.textContent = text || "No text found.";
+      }).catch(err => {
+        resultBox.textContent = "Error recognizing text.";
+        console.error(err);
+      });
+    }
+  </script>
+</body>
 </html>
+
 """, height=680)
