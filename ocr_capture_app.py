@@ -1,161 +1,144 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="OCR Camera App", layout="centered")
-st.title("📷 OCR Camera - English")
+st.set_page_config(page_title="OCR Expiry Reader", layout="centered")
+st.title("📦 Read Product Expiry Date")
 
 components.html("""
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Expiration Date Reader</title>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expiry OCR</title>
   <style>
     body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      text-align: center;
       font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 1rem;
-      background-color: #f8f8f8;
-    }
-
-    h2 {
-      margin-bottom: 10px;
     }
 
     video, canvas {
-      width: 90vw;
-      max-width: 320px;
-      aspect-ratio: 4/3;
+      width: 100%;
+      max-width: 640px;
+      height: auto;
       border-radius: 8px;
-      border: 2px solid #333;
-      background: black;
-    }
-
-    button {
-      margin-top: 12px;
-      padding: 10px 20px;
-      font-size: 1rem;
-      border: none;
-      border-radius: 6px;
-      background-color: #007bff;
-      color: white;
-      cursor: pointer;
+      margin: 0 auto;
+      display: block;
     }
 
     #result {
-      margin-top: 14px;
-      padding: 10px;
-      background-color: #fff;
-      width: 90vw;
-      max-width: 320px;
-      min-height: 60px;
-      border-radius: 6px;
-      text-align: center;
-      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+      margin-top: 12px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      white-space: pre-wrap;
+      background: #f0f0f0;
+      padding: 12px;
+      border-radius: 8px;
+      max-width: 640px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    @media (max-width: 768px) {
+      video, canvas {
+        height: 66.66vw; /* 2/3 chiều rộng trên điện thoại */
+      }
     }
   </style>
 </head>
 <body>
-  <h2>📦 Scan Expiration Date</h2>
-  <video id="video" autoplay playsinline></video>
+  <h3>📷 Capture to Read Expiry Date</h3>
+  <video id="video" autoplay muted playsinline></video>
   <canvas id="canvas" style="display:none;"></canvas>
-  <button onclick="captureAndRecognize()">📸 Capture</button>
-  <div id="result">Waiting for capture...</div>
+  <br />
+  <button onclick="captureAndRecognize()">🔍 Capture & Recognize</button>
+  <div id="result">OCR result will appear here...</div>
 
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
   <script>
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
     const resultBox = document.getElementById("result");
 
-    // 🟢 Use rear camera if on mobile
     const constraints = {
+      audio: false,
       video: {
-        facingMode: { ideal: "environment" }
-      },
-      audio: false
+        facingMode: { ideal: "environment" },
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      }
     };
 
     navigator.mediaDevices.getUserMedia(constraints)
       .then(stream => {
         video.srcObject = stream;
       })
-      .catch(error => {
-        console.error("Camera error:", error);
-        resultBox.textContent = "⚠️ Failed to access camera.";
+      .catch(err => {
+        console.error("Camera error:", err);
+        alert("Cannot access camera.");
       });
 
-    function captureAndRecognize() {
-      const context = canvas.getContext("2d");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      resultBox.textContent = "🔍 Processing...";
-
-      Tesseract.recognize(
-        canvas,
-        'eng+jpn', // English and Japanese support
-        { logger: m => console.log(m) }
-      ).then(({ data: { text } }) => {
-        const expirationDate = extractExpirationDate(text);
-        if (expirationDate) {
-          const warning = checkDateStatus(expirationDate);
-          resultBox.textContent = `📅 ${expirationDate} ${warning}`;
-        } else {
-          resultBox.textContent = "❌ No expiration date found.";
-        }
-      }).catch(err => {
-        console.error(err);
-        resultBox.textContent = "⚠️ OCR failed.";
-      });
+    function preprocessImage(ctx, width, height) {
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        const thresh = avg > 140 ? 255 : 0;
+        data[i] = data[i + 1] = data[i + 2] = thresh;
+      }
+      ctx.putImageData(imageData, 0, 0);
     }
 
-    // 📅 Extract expiration-like date from text
-    function extractExpirationDate(text) {
+    function extractExpiry(text) {
       const patterns = [
-        /\b(20\d{2})[-\/\.](\d{1,2})[-\/\.](\d{1,2})\b/,  // YYYY-MM-DD
-        /\b(\d{1,2})[-\/\.](\d{1,2})[-\/\.](20\d{2})\b/,  // DD/MM/YYYY or MM/DD/YYYY
-        /\b(20\d{2})(\d{2})(\d{2})\b/                    // YYYYMMDD
+        /exp[\s:]*([0-9]{2}[\/\-][0-9]{2,4})/i,
+        /expiry[\s:]*([0-9]{2}[\/\-][0-9]{2,4})/i,
+        /use by[\s:]*([0-9]{2,4}[\/\-][0-9]{1,2}[\/\-]?[0-9]{0,2})/i,
+        /([0-9]{2}[\/\-][0-9]{2}[\/\-][0-9]{2,4})/,
+        /([0-9]{4}[\/\-][0-9]{1,2}[\/\-][0-9]{1,2})/
       ];
 
-      for (const pattern of patterns) {
+      for (let pattern of patterns) {
         const match = text.match(pattern);
         if (match) {
-          // Normalize date string
-          const y = match[1].length === 4 ? match[1] : match[3];
-          const m = ("0" + (match[2] || match[3])).slice(-2);
-          const d = ("0" + (match[3] || match[2])).slice(-2);
-          return `${y}-${m}-${d}`;
+          return match[0];
         }
       }
 
       return null;
     }
 
-    // ⏳ Check if expired or near-expiry
-    function checkDateStatus(dateStr) {
-      const today = new Date();
-      const expDate = new Date(dateStr);
+    function captureAndRecognize() {
+      const width = 640;
+      const height = 480;
+      canvas.width = width;
+      canvas.height = height;
 
-      if (isNaN(expDate)) return "";
+      ctx.drawImage(video, 0, 0, width, height);
+      preprocessImage(ctx, width, height);
 
-      const diff = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
-      if (diff < 0) {
-        return "⚠️ Expired!";
-      } else if (diff <= 7) {
-        return `⚠️ Expiring in ${diff} day${diff === 1 ? "" : "s"}!`;
-      } else {
-        return "✅ Still valid";
-      }
+      resultBox.textContent = "⏳ Processing...";
+
+      Tesseract.recognize(canvas, 'eng', {
+        logger: m => console.log(m)
+      }).then(({ data: { text } }) => {
+        const cleaned = text.replace(/[^A-Za-z0-9 /\\:\\-]/g, '');
+        const expiry = extractExpiry(cleaned);
+        resultBox.textContent = expiry ? `✅ Found: ${expiry}` : "❌ No expiry date found.";
+      }).catch(err => {
+        resultBox.textContent = "Error recognizing text.";
+        console.error(err);
+      });
     }
   </script>
 </body>
 </html>
-
-
-""", height=680)
+""", height=720)
