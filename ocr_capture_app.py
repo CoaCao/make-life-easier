@@ -73,8 +73,8 @@ components.html("""
       audio: false,
       video: {
         facingMode: { ideal: "environment" },
-        width: { ideal: 640 },
-        height: { ideal: 480 }
+        width: { ideal: 800 },
+        height: { ideal: 600 }
       }
     };
 
@@ -100,7 +100,7 @@ components.html("""
 
     function extractExpiry(text) {
       const patterns = [
-        /exp[\s:]*([0-9]{2}[\/\-][0-9]{2,4})/i,
+        /exp[\s:]*([0-9]{2}[\/\-\.][0-9]{2,4})/i,
         /expiry[\s:]*([0-9]{2}[\/\-][0-9]{2,4})/i,
         /use by[\s:]*([0-9]{2,4}[\/\-][0-9]{1,2}(?:[\/\-][0-9]{1,2})?)/i,
         /best before[\s:]*([0-9]{2,4}[\/\-][0-9]{1,2}(?:[\/\-][0-9]{1,2})?)/i,
