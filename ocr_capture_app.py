@@ -101,20 +101,21 @@ components.html("""
       const patterns = [
         /exp[\s:]*([0-9]{2}[\/\-][0-9]{2,4})/i,
         /expiry[\s:]*([0-9]{2}[\/\-][0-9]{2,4})/i,
-        /use by[\s:]*([0-9]{2,4}[\/\-][0-9]{1,2}[\/\-]?[0-9]{0,2})/i,
-        /([0-9]{2}[\/\-][0-9]{2}[\/\-][0-9]{2,4})/,
-        /([0-9]{4}[\/\-][0-9]{1,2}[\/\-][0-9]{1,2})/
+        /use by[\s:]*([0-9]{2,4}[\/\-][0-9]{1,2}(?:[\/\-][0-9]{1,2})?)/i,
+        /best before[\s:]*([0-9]{2,4}[\/\-][0-9]{1,2}(?:[\/\-][0-9]{1,2})?)/i,
+        /\b([0-9]{2}[\/\-][0-9]{4})\b/,
+        /\b([0-9]{2}[\/\-][0-9]{2})\b/
       ];
-
+    
       for (let pattern of patterns) {
         const match = text.match(pattern);
         if (match) {
-          return match[0];
+          return match[1];  // chỉ lấy phần sau (ngày) thay vì toàn bộ cụm
         }
       }
-
-      return null;
+      return "";  // trả về chuỗi rỗng nếu không khớp
     }
+
 
     function captureAndRecognize() {
       const width = 640;
@@ -132,7 +133,8 @@ components.html("""
       }).then(({ data: { text } }) => {
         const cleaned = text.replace(/[^A-Za-z0-9 /\\:\\-]/g, '');
         const expiry = extractExpiry(cleaned);
-        resultBox.textContent = expiry ? `✅ Found: ${expiry}` : "❌ No expiry date found.";
+        
+        resultBox.textContent = expiry &&  ? expiry != "" `✅ Found: ${expiry}` : "❌ No expiry date found.";
       }).catch(err => {
         resultBox.textContent = "Error recognizing text.";
         console.error(err);
