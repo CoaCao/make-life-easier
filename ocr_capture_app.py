@@ -1,8 +1,8 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="OCR Expiry Reader", layout="centered")
-st.title("📦 Read Product Expiry Date")
+st.set_page_config(page_title="OCR Camera App", layout="centered")
+st.title("📦 Expiry Date Scanner")
 
 components.html("""
 <!DOCTYPE html>
@@ -10,56 +10,46 @@ components.html("""
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Expiry OCR</title>
+  <title>Expiry Date OCR</title>
   <style>
-    body {
-      text-align: center;
-      font-family: Arial, sans-serif;
-    }
-
     video, canvas {
       width: 100%;
       max-width: 800px;
-      height: auto;
       border-radius: 8px;
-      margin: 0 auto;
-      display: block;
     }
-    
 
     #result {
       margin-top: 12px;
-      font-size: 1.1rem;
+      font-size: 1.4rem;
       font-weight: bold;
-      white-space: pre-wrap;
-      background: #f0f0f0;
+      color: #003366;
+      text-align: center;
+      background: #f8f8f8;
       padding: 12px;
       border-radius: 8px;
-      max-width: 640px;
-      margin-left: auto;
-      margin-right: auto;
     }
 
     button {
       margin-top: 10px;
       padding: 10px 20px;
-      font-size: 1rem;
-      cursor: pointer;
+      font-size: 1.1rem;
     }
 
     @media (max-width: 768px) {
       video, canvas {
-        height: 66.66vw; /* 2/3 chiều rộng trên điện thoại */
+        width: 100%;
+        height: auto;
       }
     }
   </style>
 </head>
 <body>
-  <h3>📷 Capture to Read Expiry Date</h3>
+  <h2 style="text-align:center;">📷 Scan Expiry Date</h2>
   <video id="video" autoplay muted playsinline></video>
   <canvas id="canvas" style="display:none;"></canvas>
-  <br />
-  <button onclick="captureAndRecognize()">🔍 Capture & Recognize</button>
+  <div style="text-align:center;">
+    <button onclick="captureAndRecognize()">🔍 Capture & Recognize</button>
+  </div>
   <div id="result">OCR result will appear here...</div>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
@@ -69,6 +59,7 @@ components.html("""
     const ctx = canvas.getContext("2d");
     const resultBox = document.getElementById("result");
 
+    // Rear camera if on mobile
     const constraints = {
       audio: false,
       video: {
@@ -92,8 +83,8 @@ components.html("""
       const data = imageData.data;
       for (let i = 0; i < data.length; i += 4) {
         const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-        const thresh = avg > 140 ? 255 : 0;
-        data[i] = data[i + 1] = data[i + 2] = thresh;
+        const binary = avg > 140 ? 255 : 0;
+        data[i] = data[i + 1] = data[i + 2] = binary;
       }
       ctx.putImageData(imageData, 0, 0);
     }
@@ -101,22 +92,19 @@ components.html("""
     function extractExpiry(text) {
       const patterns = [
         /exp[\s:]*([0-9]{2}[\/\-\.][0-9]{2,4})/i,
-        /expiry[\s:]*([0-9]{2}[\/\-][0-9]{2,4})/i,
-        /use by[\s:]*([0-9]{2,4}[\/\-][0-9]{1,2}(?:[\/\-][0-9]{1,2})?)/i,
-        /best before[\s:]*([0-9]{2,4}[\/\-][0-9]{1,2}(?:[\/\-][0-9]{1,2})?)/i,
-        /\b([0-9]{2}[\/\-][0-9]{4})\b/,
-        /\b([0-9]{2}[\/\-][0-9]{2})\b/
+        /expiry[\s:]*([0-9]{2}[\/\-\.][0-9]{2,4})/i,
+        /use by[\s:]*([0-9]{2,4}[\/\-\.][0-9]{1,2}(?:[\/\-\.][0-9]{1,2})?)/i,
+        /best before[\s:]*([0-9]{2,4}[\/\-\.][0-9]{1,2}(?:[\/\-\.][0-9]{1,2})?)/i,
+        /\b([0-9]{2}[\/\-\.][0-9]{4})\b/,
+        /\b([0-9]{2}[\/\-\.][0-9]{2})\b/
       ];
-    
+
       for (let pattern of patterns) {
         const match = text.match(pattern);
-        if (match) {
-          return match[1];  // chỉ lấy phần sau (ngày) thay vì toàn bộ cụm
-        }
+        if (match) return match[1];
       }
-      return "";  // trả về chuỗi rỗng nếu không khớp
+      return "";
     }
-
 
     function captureAndRecognize() {
       const width = 800;
@@ -132,16 +120,15 @@ components.html("""
       Tesseract.recognize(canvas, 'eng', {
         logger: m => console.log(m)
       }).then(({ data: { text } }) => {
-        const cleaned = text.replace(/[^A-Za-z0-9 /\\:\\-]/g, '');
+        const cleaned = text.replace(/[^A-Za-z0-9 \/:\-\.]/g, '');
         const expiry = extractExpiry(cleaned);
-        
-        resultBox.textContent = expiry && expiry != "" ? `✅ Found: ${expiry}` : "❌ No expiry date found.";
+        resultBox.textContent = expiry || "";
       }).catch(err => {
-        resultBox.textContent = "Error recognizing text.";
         console.error(err);
+        resultBox.textContent = "";
       });
     }
   </script>
 </body>
 </html>
-""", height=720)
+""", height=700)
