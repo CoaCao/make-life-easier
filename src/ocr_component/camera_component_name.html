@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Scan Name</title>
+  <style>
+    video, canvas {
+      width: 100%;
+      max-width: 500px;
+      border-radius: 8px;
+    }
+    #captureBtn {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="camera-container">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <br />
+    <button id="captureBtn">Capture</button>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const captureBtn = document.getElementById('captureBtn');
+
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } }
+    }).then(stream => {
+      video.srcObject = stream;
+      document.getElementById("camera-container").style.display = "block";
+    }).catch(e => alert("Camera access error: " + e));
+
+    captureBtn.onclick = async () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      preprocess();
+
+      const result = await Tesseract.recognize(canvas, 'eng');
+      const text = result.data.text;
+      const cleaned = text.replace(/[^A-Za-z0-9 ]/g, '').trim();
+      console.log(cleaned);
+
+      const streamlitDoc = window.parent.document;
+      const streamlitInput = streamlitDoc.querySelector('input[id="text_input_1"]');
+      if (streamlitInput) {
+        streamlitInput.value = cleaned;
+        streamlitInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      document.getElementById("camera-container").style.display = "none";
+    };
+
+    function preprocess() {
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const avg = (d[i] + d[i+1] + d[i+2]) / 3;
+        const bin = avg > 130 ? 255 : 0;
+        d[i] = d[i+1] = d[i+2] = bin;
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+  </script>
+</body>
+</html>
