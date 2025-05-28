@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Camera OCR</title>
+  <style>
+    #camera-container {
+      display: none;
+      text-align: center;
+      margin-top: 10px;
+    }
+    video, canvas {
+      width: 100%;
+      max-width: 480px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 8px 16px;
+      font-size: 1rem;
+    }
+    #result {
+      font-weight: bold;
+      margin-top: 8px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="camera-container">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="canvas" style="display: none;"></canvas><br/>
+    <button onclick="captureAndRecognize()">📸 Capture</button>
+    <div id="result"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script>
+    let currentMode = null; // 'name' or 'expiration'
+    let stream = null;
+
+    function startCamera(mode) {
+      currentMode = mode;
+      const constraints = {
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 800 }, height: { ideal: 600 } },
+        audio: false
+      };
+      navigator.mediaDevices.getUserMedia(constraints)
+        .then(s => {
+          stream = s;
+          document.getElementById("video").srcObject = s;
+          document.getElementById("camera-container").style.display = "block";
+        })
+        .catch(err => {
+          alert("Cannot access camera.");
+          console.error(err);
+        });
+    }
+
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      document.getElementById("camera-container").style.display = "none";
+    }
+
+    function preprocessImage(ctx, width, height) {
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        const thresh = avg > 140 ? 255 : 0;
+        data[i] = data[i + 1] = data[i + 2] = thresh;
+      }
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    function captureAndRecognize() {
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      const resultBox = document.getElementById("result");
+
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      canvas.width = width;
+      canvas.height = height;
+
+      ctx.drawImage(video, 0, 0, width, height);
+      preprocessImage(ctx, width, height);
+
+      resultBox.textContent = "⏳ Recognizing...";
+
+      Tesseract.recognize(canvas, 'eng', {
+        logger: m => console.log(m)
+      }).then(({ data: { text } }) => {
+        stopCamera(); // ✅ Tắt camera
+
+        let finalText = text || "";
+        let result = "";
+
+        if (currentMode === 'name') {
+          result = finalText.replace(/[^A-Za-z0-9 \-]/g, '').trim();
+          const input1 = parent.document.getElementById("text_input_1");
+          // if (input1) input1.value = result;
+          Streamlit.setComponentValue(cleaned);
+
+        } else if (currentMode === 'expiration') {
+          const match = finalText.match(/(?:\d{1,2}[- /.])?(?:\d{1,2}[- /.])?\d{4}/);
+          result = match ? match[0] : "";
+          const input3 = parent.document.getElementById("text_input_3");
+          if (input3) input3.value = result;
+        }
+
+        resultBox.textContent = result || "❌ No valid result found.";
+      }).catch(err => {
+        resultBox.textContent = "❌ Error recognizing text.";
+        console.error(err);
+        stopCamera();
+      });
+    }
+  </script>
+</body>
+</html>

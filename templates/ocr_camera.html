@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OCR</title>
+</head>
+<body>
+  <video id="video" autoplay playsinline style="width:100%; max-width: 600px; border-radius: 10px;"></video><br/>
+  <button onclick="capture()">📸 Capture</button>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } }
+    }).then(stream => {
+      video.srcObject = stream;
+    }).catch(err => alert("Camera access denied"));
+
+    function capture() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      Tesseract.recognize(canvas, 'eng', {
+        logger: m => console.log(m)
+      }).then(({ data: { text } }) => {
+        const expOnly = text.match(/(exp.*?(\d{2,4}[\-\/\.]\d{1,2}[\-\/\.]?\d{0,4}))/i) || text.match(/\d{2}\/\d{4}|\d{4}\.\d{2}\.\d{2}/i);
+        const result = expOnly ? expOnly[0] : "";
+        window.parent.postMessage({ type: "ocr-result", text: result }, "*");
+      });
+    }
+  </script>
+</body>
+</html>

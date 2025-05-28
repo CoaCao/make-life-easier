@@ -1,136 +1,69 @@
 import streamlit as st
 import streamlit.components.v1 as components
+from db import init_db, add_product, get_products, update_product
 
-st.set_page_config(page_title="OCR Camera App", layout="centered")
-st.title("📦 Expiry Date Scanner")
+init_db()
+st.set_page_config(page_title="Product Expiry OCR", layout="centered")
 
-components.html("""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Expiry Date OCR</title>
-  <style>
-    video, canvas {
-      width: 100%;
-      max-width: 800px;
-      border-radius: 8px;
+tab1, tab2, tab3 = st.tabs(["📋 Product List", "➕ Add Product", "✏️ Edit Product"])
+
+# Session for edited product
+if "edit_product" not in st.session_state:
+    st.session_state.edit_product = None
+
+with tab1:
+    st.subheader("📋 Product List")
+    data = get_products()
+    for row in data:
+        id, name, created, exp = row
+        col1, col2, col3, col4 = st.columns([4, 3, 3, 2])
+        col1.write(name)
+        col2.write(created)
+        col3.write(exp)
+        if col4.button("Edit", key=f"edit_{id}"):
+            st.session_state.edit_product = row
+            st.experimental_set_query_params(tab="Edit Product")
+
+with tab2:
+    st.subheader("➕ Add New Product")
+    name = st.text_input("Product Name", key="name_input")
+    if st.button("📷 Scan Name"):
+        components.html(open("templates/ocr_camera.html", encoding="utf8").read(), height=600)
+
+    exp_date = st.text_input("Expiration Date", key="exp_input")
+    if st.button("📷 Scan Expiration Date"):
+        components.html(open("templates/ocr_camera.html", encoding="utf8").read(), height=600)
+
+    if st.button("Add Product"):
+        if name and exp_date:
+            add_product(name, exp_date)
+            st.success("Product added successfully!")
+        else:
+            st.warning("Please fill in all fields.")
+
+with tab3:
+    if st.session_state.edit_product:
+        st.subheader("✏️ Edit Product")
+        id, name, created, exp = st.session_state.edit_product
+        new_name = st.text_input("Product Name", value=name, key="edit_name")
+        new_exp = st.text_input("Expiration Date", value=exp, key="edit_exp")
+
+        if st.button("Save Changes"):
+            update_product(id, new_name, new_exp)
+            st.success("Product updated!")
+            st.session_state.edit_product = None
+
+# Lắng nghe dữ liệu từ iframe (client-side OCR)
+st.markdown("""
+<script>
+window.addEventListener("message", (event) => {
+    if (event.data?.type === "ocr-result") {
+        const text = event.data.text;
+        const nameInput = window.parent.document.querySelector('input[data-testid="stTextInput"][placeholder="Product Name"]');
+        const expInput = window.parent.document.querySelector('input[data-testid="stTextInput"][placeholder="Expiration Date"]');
+        if (nameInput && !nameInput.value) nameInput.value = text;
+        if (expInput && !expInput.value) expInput.value = text;
     }
-
-    #result {
-      margin-top: 12px;
-      font-size: 1.4rem;
-      font-weight: bold;
-      color: #003366;
-      text-align: center;
-      background: #f8f8f8;
-      padding: 12px;
-      border-radius: 8px;
-    }
-
-    button {
-      margin-top: 10px;
-      padding: 10px 20px;
-      font-size: 1.1rem;
-    }
-
-    @media (max-width: 768px) {
-      video, canvas {
-        width: 100%;
-        height: auto;
-      }
-    }
-  </style>
-</head>
-<body>
-  <h2 style="text-align:center;">📷 Scan Expiry Date</h2>
-  <video id="video" autoplay muted playsinline></video>
-  <canvas id="canvas" style="display:none;"></canvas>
-  <div style="text-align:center;">
-    <button onclick="captureAndRecognize()">🔍 Capture & Recognize</button>
-  </div>
-  <div id="result">OCR result will appear here...</div>
-
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-  <script>
-    const video = document.getElementById("video");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    const resultBox = document.getElementById("result");
-
-    // Rear camera if on mobile
-    const constraints = {
-      audio: false,
-      video: {
-        facingMode: { ideal: "environment" },
-        width: { ideal: 800 },
-        height: { ideal: 600 }
-      }
-    };
-
-    navigator.mediaDevices.getUserMedia(constraints)
-      .then(stream => {
-        video.srcObject = stream;
-      })
-      .catch(err => {
-        console.error("Camera error:", err);
-        alert("Cannot access camera.");
-      });
-
-    function preprocessImage(ctx, width, height) {
-      const imageData = ctx.getImageData(0, 0, width, height);
-      const data = imageData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-        const binary = avg > 140 ? 255 : 0;
-        data[i] = data[i + 1] = data[i + 2] = binary;
-      }
-      ctx.putImageData(imageData, 0, 0);
-    }
-
-    function extractExpiry(text) {
-      const patterns = [
-        /exp[\s:]*([0-9]{2}[\/\-.][0-9]{2,4})/i,
-        /exp[\s:]*([0-9]{4}[\/\-.][0-9]{2}(?:[\/\-.][0-9]{2})?)/i,
-        /expiry[\s:]*([0-9]{4}[\/\-.][0-9]{2}(?:[\/\-.][0-9]{2})?)/i,
-        /use by[\s:]*([0-9]{4}[\/\-.][0-9]{2}(?:[\/\-.][0-9]{2})?)/i,
-        /best before[\s:]*([0-9]{4}[\/\-.][0-9]{2}(?:[\/\-.][0-9]{2})?)/i,
-        /\b([0-9]{4}[\/\-.][0-9]{2}[\/\-.][0-9]{2})\b/,    // e.g. 2025-09-05 or 2025.09.05
-        /\b([0-9]{2}[\/\-.][0-9]{2,4})\b/,                 // fallback
-        /\b([0-9]{4}[\/\-.][0-9]{2})\b/
-      ];
-
-      for (let pattern of patterns) {
-        const match = text.match(pattern);
-        if (match) return match[1];
-      }
-      return "";
-    }
-
-    function captureAndRecognize() {
-      const width = 800;
-      const height = 600;
-      canvas.width = width;
-      canvas.height = height;
-
-      ctx.drawImage(video, 0, 0, width, height);
-      preprocessImage(ctx, width, height);
-
-      resultBox.textContent = "⏳ Processing...";
-
-      Tesseract.recognize(canvas, 'eng', {
-        logger: m => console.log(m)
-      }).then(({ data: { text } }) => {
-        const cleaned = text.replace(/[^A-Za-z0-9 \/:\-\.]/g, '');
-        const expiry = extractExpiry(cleaned);
-        resultBox.textContent = expiry || "";
-      }).catch(err => {
-        console.error(err);
-        resultBox.textContent = "";
-      });
-    }
-  </script>
-</body>
-</html>
-""", height=700)
+});
+</script>
+""", unsafe_allow_html=True)

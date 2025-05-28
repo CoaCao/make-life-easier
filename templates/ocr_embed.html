@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OCR Input</title>
+  <style>
+    body { text-align: center; }
+    video, canvas {
+      width: 100%;
+      max-width: 360px;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    #result {
+      white-space: pre-wrap;
+      background: #f0f0f0;
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    button {
+      margin-top: 8px;
+      padding: 10px 16px;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h4>📷 Tap input field to scan</h4>
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <br />
+  <button onclick="capture()">🔍 Capture</button>
+  <div id="result">OCR result will appear here...</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const resultBox = document.getElementById("result");
+    const ctx = canvas.getContext("2d");
+
+    const constraints = {
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      }
+    };
+
+    navigator.mediaDevices.getUserMedia(constraints)
+      .then(stream => video.srcObject = stream)
+      .catch(err => alert("Camera access denied."));
+
+    function preprocessImage(ctx, width, height) {
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i+1] + data[i+2]) / 3;
+        const threshold = avg > 140 ? 255 : 0;
+        data[i] = data[i+1] = data[i+2] = threshold;
+      }
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    function capture() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      preprocessImage(ctx, canvas.width, canvas.height);
+
+      resultBox.textContent = "Processing...";
+      Tesseract.recognize(canvas, 'eng', {
+        logger: m => console.log(m)
+      }).then(({ data: { text } }) => {
+        let expOnly = text.match(/(?:EXP|Exp|exp)?\s*(\d{2}[\/.-]\d{4}|\d{4}[\/.-]\d{2}[\/.-]\d{2})/);
+        let value = expOnly ? expOnly[1] : "";
+        resultBox.textContent = value || "No valid expiration date found.";
+
+        const active = document.activeElement;
+        if (active && active.tagName === "INPUT") {
+          active.value = value;
+          active.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }).catch(err => {
+        resultBox.textContent = "Error recognizing text.";
+        console.error(err);
+      });
+    }
+  </script>
+</body>
+</html>
