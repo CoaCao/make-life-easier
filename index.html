@@ -91,6 +91,7 @@
             width: 100%;
             max-width: 400px;
             border-radius: 8px;
+            margin-bottom: 10p
         }
 
         #videoContainer button {
@@ -251,13 +252,6 @@
             max-width: 400px;
         }
 
-        video {
-            width: 100%;
-            max-height: 300px;
-            border-radius: 6px;
-            margin-bottom: 10px;
-        }
-
         #captureBtn {
             display: block;
             width: 100%;
@@ -389,7 +383,7 @@
     <div class="modal-content popup-content">
         <span class="close close-btn" onclick="closeCameraPopup()">&times;</span>
         <div id="videoContainer">
-            <video id="video" autoplay></video>
+            <video id="video" autoplay playsinline mute></video>
             <button onclick="captureImage()" id="captureBtn">📸 Capture</button>
             <canvas id="canvas" style="display:none;"></canvas>
         </div>
