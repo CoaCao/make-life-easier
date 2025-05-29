@@ -523,7 +523,18 @@
         openCameraPopup();
         currentInput = document.getElementById(inputId);
         // document.getElementById("videoContainer").style.display = "block";
-        navigator.mediaDevices.getUserMedia({video: true}).then(stream => {
+
+        // Rear camera if on mobile
+        const constraints = {
+            audio: false,
+            video: {
+                facingMode: {ideal: "environment"},
+                width: {ideal: 800},
+                height: {ideal: 600}
+            }
+        };
+
+        navigator.mediaDevices.getUserMedia(constraints).then(stream => {
             videoStream = stream;
             const video = document.getElementById("video");
             video.srcObject = stream;
