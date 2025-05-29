@@ -608,9 +608,11 @@
         const constraints = {
             audio: false,
             video: {
+                spectRatio: 4 / 3,
                 facingMode: {ideal: "environment"},
                 width: {ideal: 600},
-                height: {ideal: 400}
+                height: {ideal: 400},
+                playsinline: false,
             }
         };
 
