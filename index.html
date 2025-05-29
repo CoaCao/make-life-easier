@@ -248,6 +248,50 @@
             font-size: 24px;
             cursor: pointer;
         }
+
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            /*display: flex;*/
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            display: none;
+        }
+
+        .popup-content {
+            background: #fff;
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            width: 95%;
+            max-width: 400px;
+        }
+
+        video {
+            width: 100%;
+            max-height: 300px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        #captureBtn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        .close-btn {
+            background-color: #ccc;
+            padding: 6px 12px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -317,13 +361,13 @@
 <!--    <canvas id="canvas" style="display:none;"></canvas>-->
 <!--</div>-->
 
-<div id="videoModal" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeCameraPopup()">&times;</span>
+<div id="videoModal" class="modal popup-overlay">
+    <div class="modal-content popup-content">
+        <span class="close close-btn" onclick="closeCameraPopup()">&times;</span>
         <div id="videoContainer">
             <video id="video" autoplay></video>
-            <button onclick="captureImage()">📸 Capture</button>
-            <canvas id="canvas" style="display:none;"></canvas>
+            <button onclick="captureImage()" id="captureBtn">📸 Capture</button>
+            <canvas id="canvas" style="display:none;" ></canvas>
         </div>
     </div>
 </div>
