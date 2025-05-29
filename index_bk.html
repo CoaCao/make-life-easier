@@ -401,15 +401,6 @@
 <script src="https://cdn.jsdelivr.net/npm/sql.js@1.8.0/dist/sql-wasm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-    const inputExpPicker = flatpickr("#expInput", {
-        dateFormat: "Y-m-d",         // Format lưu trữ trong value
-        altInput: false,              // Kích hoạt hiển thị khác
-        altFormat: "Y-m-d"           // Format để hiển thị
-    });
-
-    const editExpPicker = flatpickr("#editExp", {
-        dateFormat: "Y-m-d"
-    });
     let SQL, db, currentInput = null;
     let videoStream;
 
@@ -605,8 +596,8 @@
             audio: false,
             video: {
                 facingMode: {ideal: "environment"},
-                width: {ideal: 1280},
-                height: {ideal: 720}
+                width: {ideal: 800},
+                height: {ideal: 600}
             }
         };
 
@@ -641,95 +632,52 @@
         const video = document.getElementById("video");
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
-
-        // Set true canvas size
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-
-        // Vẽ current frame into canvas
         ctx.drawImage(video, 0, 0);
+        preprocess(ctx, canvas)
 
-        // Preprocess image: grayscale + threshold
-        preprocess(ctx, canvas);
-
-        // Get image with base64 format
         const dataURL = canvas.toDataURL("image/png");
 
-        // Limit chars recognize
-        const whitelist = currentInput.id === "expInput"
-            ? "0123456789./-"
-            : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ";
+        Tesseract.recognize(dataURL, 'eng').then(({data: {text}}) => {
 
-        // Recognize text by Tesseract
-        Tesseract.recognize(
-            dataURL,
-            'eng',
-            {
-                logger: m => console.log(m),
-                tessedit_char_whitelist: whitelist,
-                preserve_interword_spaces: 1,
-            }
-        ).then(({data: {text}}) => {
             if (currentInput.id === "expInput") {
-                // const cleaned = text.replace(/[^0-9\-./]/g, '');
-                console.log("Cleaned Expiration: ", text);
-                const cleanedExpireDate = formatDateToYYYYMMDD(extractExpiry(text))
-                console.log("cleanedExpireDate: ", cleanedExpireDate);
-
-                currentInput.value = cleanedExpireDate;
-                inputExpPicker.setDate(cleanedExpireDate);
+                const cleaned = text.replace(/[^A-Za-z0-9 \/\-:.]/g, '');
+                console.log("cleaned: ", cleaned);
+                currentInput.value = formatDateToYYYYMMDD(extractExpiry(cleaned));
             } else {
                 currentInput.value = text.replace(/[^A-Za-z0-9 ]/g, '');
             }
 
             stopCamera();
+
         }).catch(err => {
-            console.error("OCR error:", err);
-            currentInput.placeholder = "OCR failed. Please try again.";
-            stopCamera();
+            console.error(err);
+            currentInput.placeholder = "Could not camera capture, please try again. !";
         });
     }
 
-
     function preprocess(ctx, canvas) {
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imgData.data;
-
-        for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
-
-            // Grayscale (luminosity method)
-            const gray = 0.3 * r + 0.59 * g + 0.11 * b;
-
-            // Binary threshold
-            const bin = gray > 130 ? 255 : 0;
-
-            data[i] = data[i + 1] = data[i + 2] = bin; // set to black/white
+        const d = imgData.data;
+        for (let i = 0; i < d.length; i += 4) {
+            const avg = (d[i] + d[i + 1] + d[i + 2]) / 3;
+            const bin = avg > 130 ? 255 : 0;
+            d[i] = d[i + 1] = d[i + 2] = bin;
         }
-
         ctx.putImageData(imgData, 0, 0);
     }
 
-
     function extractExpiry(text) {
-        // const patterns = [
-        //     /exp[\s:]*([0-9]{2}[\/\-:.][0-9]{2,4})/i,
-        //     /exp[\s:]*([0-9]{4}[\/\-:.][0-9]{2}(?:[\/\-:.][0-9]{2})?)/i,
-        //     /expiry[\s:]*([0-9]{4}[\/\-:.][0-9]{2}(?:[\/\-:.][0-9]{2})?)/i,
-        //     /use by[\s:]*([0-9]{4}[\/\-:.][0-9]{2}(?:[\/\-:.][0-9]{2})?)/i,
-        //     /best before[\s:]*([0-9]{4}[\/\-:.][0-9]{2}(?:[\/\-:.][0-9]{2})?)/i,
-        //     /\b([0-9]{4}[\/\-:.][0-9]{2}[\/\-:.][0-9]{2})\b/,    // e.g. 2025-09-05 or 2025.09.05
-        //     /\b([0-9]{2}[\/\-:.][0-9]{2,4})\b/,                 // fallback
-        //     /\b([0-9]{4}[\/\-:.][0-9]{2})\b/
-        // ];
         const patterns = [
-            /\b(20\d{2})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})\b/,    // yyyy-mm-dd
-            /\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](20\d{2})\b/,    // dd-mm-yyyy
-            /\b(\d{1,2})[\/\-\.](20\d{2})\b/,                     // mm-yyyy
-            /\b(20\d{2})[\/\-\.](\d{1,2})\b/,                     // yyyy-mm
-            /\b(\d{2})[\/\-\.](\d{2})\b/,                         // mm/yy hoặc yy/mm
+            /exp[\s:]*([0-9]{2}[\/\-:.][0-9]{2,4})/i,
+            /exp[\s:]*([0-9]{4}[\/\-:.][0-9]{2}(?:[\/\-:.][0-9]{2})?)/i,
+            /expiry[\s:]*([0-9]{4}[\/\-:.][0-9]{2}(?:[\/\-:.][0-9]{2})?)/i,
+            /use by[\s:]*([0-9]{4}[\/\-:.][0-9]{2}(?:[\/\-:.][0-9]{2})?)/i,
+            /best before[\s:]*([0-9]{4}[\/\-:.][0-9]{2}(?:[\/\-:.][0-9]{2})?)/i,
+            /\b([0-9]{4}[\/\-:.][0-9]{2}[\/\-:.][0-9]{2})\b/,    // e.g. 2025-09-05 or 2025.09.05
+            /\b([0-9]{2}[\/\-:.][0-9]{2,4})\b/,                 // fallback
+            /\b([0-9]{4}[\/\-:.][0-9]{2})\b/
         ];
 
         for (let pattern of patterns) {
@@ -739,40 +687,46 @@
         return "";
     }
 
-    function formatDateToYYYYMMDD(dateStr) {
-        if (!dateStr) return '';
+    function formatDateToYYYYMMDD(dateString) {
+        if (!dateString || typeof dateString !== 'string') return null;
 
-        dateStr = dateStr.trim();
+        dateString = dateString.trim();
 
-        const parts = dateStr.match(/\d+/g);
-        if (!parts) return '';
-
-        let yyyy = '2025';
-        let mm = '01';
-        let dd = '01';
-
-        if (parts.length === 3) {
-            if (parts[0].length === 4) { // yyyy-mm-dd
-                [yyyy, mm, dd] = parts;
-            } else if (parts[2].length === 4) { // dd-mm-yyyy
-                [dd, mm, yyyy] = parts;
-            }
-        } else if (parts.length === 2) {
-            if (parts[1].length === 4) { // mm-yyyy
-                [mm, yyyy] = parts;
-            } else if (parts[0].length === 4) { // yyyy-mm
-                [yyyy, mm] = parts;
-            } else { // mm-yy hoặc yy-mm
-                [mm, yy] = parts;
-                yyyy = '20' + yy;
-            }
+        // Kiểm tra xem chỉ có năm (4 số) hay không
+        const yearOnlyMatch = dateString.match(/^(\d{4})$/);
+        if (yearOnlyMatch) {
+            return `${yearOnlyMatch[1]}-01-01`;
         }
 
-        // Đảm bảo 2 chữ số
-        if (mm.length === 1) mm = '0' + mm;
-        if (dd.length === 1) dd = '0' + dd;
+        // Kiểm tra có năm-tháng (YYYY-MM hoặc YYYY.MM hoặc YYYY/MM)
+        const yearMonthMatch = dateString.match(/^(\d{4})[-./](\d{1,2})$/);
+        if (yearMonthMatch) {
+            const year = yearMonthMatch[1];
+            const month = yearMonthMatch[2].padStart(2, '0');
+            return `${year}-${month}-01`;
+        }
 
-        return `${yyyy}-${mm}-${dd}`;
+        // Check month year (MM-YYYY or MM.YYYY or MM/YYYY)
+        const monthYearMatch = dateString.match(/^(\d{1,2})[-./](\d{4})$/);
+        if (monthYearMatch) {
+            const year = monthYearMatch[2];
+            const month = monthYearMatch[1].padStart(2, '0');
+            return `${year}-${month}-01`;
+        }
+
+        // Try parse normal Date
+        const date = new Date(dateString);
+        if (isNaN(date)) return null;
+
+        //  Check if a string contains a date (number 1-31)
+        const dayRegex = /\b([0-2]?[0-9]|3[01])\b/;
+        const hasDay = dayRegex.test(dateString);
+
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = hasDay ? date.getDate().toString().padStart(2, '0') : '01';
+
+        return `${year}-${month}-${day}`;
     }
 
     document.querySelectorAll("th.sortable").forEach(th => {
@@ -806,6 +760,14 @@
         }
         return null;
     }
+
+    flatpickr("#expInput", {
+        dateFormat: "Y-m-d"
+    });
+
+    const editExpPicker = flatpickr("#editExp", {
+        dateFormat: "Y-m-d"
+    });
 </script>
 </body>
 </html>
