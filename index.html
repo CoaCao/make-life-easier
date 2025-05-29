@@ -207,9 +207,6 @@
             height: 100%;
             overflow: auto;
             background-color: rgba(0, 0, 0, 0.6);
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
         }
 
         .modal-content {
@@ -218,7 +215,7 @@
             padding: 16px;
             border-radius: 10px;
             width: 90%;
-            max-width: 480px;
+            max-width: 500px;
             position: relative;
             text-align: center;
         }
@@ -255,11 +252,10 @@
         }
 
         video {
-            width: 90vw; /* chiếm 90% chiều rộng màn hình */
-            max-width: 480px; /* tối đa 480px */
-            height: auto;
-            border-radius: 10px;
-            box-shadow: 0 0 10px #000;
+            width: 100%;
+            max-height: 300px;
+            border-radius: 6px;
+            margin-bottom: 10px;
         }
 
         #captureBtn {
@@ -608,11 +604,10 @@
         const constraints = {
             audio: false,
             video: {
-                spectRatio: 4 / 3,
+                aspectRatio: 4 / 3,
                 facingMode: {ideal: "environment"},
                 width: {ideal: 600},
-                height: {ideal: 400},
-                playsinline: false,
+                height: {ideal: 400}
             }
         };
 
