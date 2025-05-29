@@ -89,9 +89,11 @@
 
         #videoContainer video {
             width: 100%;
-            max-width: 400px;
+            /*max-width: 400px;*/
+            height: auto;
+            aspect-ratio: 16 / 9;
             border-radius: 8px;
-            margin-bottom: 10p
+            margin-bottom: 10px;
         }
 
         #videoContainer button {
@@ -260,10 +262,11 @@
             margin-bottom: 8px;
         }
 
-        .close-btn {
+        .close_camera-btn {
             background-color: #ccc;
             padding: 6px 12px;
             font-size: 14px;
+            z-index: 9999;
         }
 
         /* Responsive Design for Smartphones */
@@ -304,6 +307,7 @@
 
             video {
                 max-height: 240px;
+                width: 100%;
             }
 
             .tab {
@@ -381,9 +385,9 @@
 
 <div id="videoModal" class="modal popup-overlay">
     <div class="modal-content popup-content">
-        <span class="close close-btn" onclick="closeCameraPopup()">&times;</span>
+        <span class="close close_camera-btn" onclick="stopCamera()">&times;</span>
         <div id="videoContainer">
-            <video id="video" autoplay playsinline mute></video>
+            <video id="video" autoplay playsinline muted></video>
             <button onclick="captureImage()" id="captureBtn">📸 Capture</button>
             <canvas id="canvas" style="display:none;"></canvas>
         </div>
@@ -598,10 +602,10 @@
         const constraints = {
             audio: false,
             video: {
-                aspectRatio: 4 / 3,
                 facingMode: {ideal: "environment"},
-                width: {ideal: 600},
-                height: {ideal: 400}
+                width: {ideal: 1280},
+                height: {ideal: 720},
+                aspectRatio: {ideal: 16 / 9}
             }
         };
 
