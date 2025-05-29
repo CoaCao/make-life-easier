@@ -64,23 +64,6 @@
             background-color: #45a049;
         }
 
-        .small-btn {
-            padding: 4px 8px;
-            font-size: 12px;
-        }
-
-        .icon-btn {
-            background-color: transparent;
-            border: none;
-            font-size: 18px;
-            cursor: pointer;
-            color: #333;
-        }
-
-        .icon-btn:hover {
-            color: #000;
-        }
-
         .form-group {
             margin-bottom: 12px;
         }
@@ -97,10 +80,6 @@
 
         .content.active {
             display: block;
-        }
-
-        .row {
-            margin-bottom: 10px;
         }
 
         #videoContainer {
@@ -292,6 +271,52 @@
             padding: 6px 12px;
             font-size: 14px;
         }
+
+        /* Responsive Design for Smartphones */
+        /* Responsive table scroll on small screens */
+        @media (max-width: 768px) {
+            table {
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+
+            thead, tbody, th, td, tr {
+                display: revert; /* giữ nguyên kiểu bảng */
+            }
+
+            .tab-bar {
+                flex-direction: column;
+            }
+
+            .flex-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            button, input[type="text"], input[type="date"] {
+                width: 100%;
+                font-size: 15px;
+            }
+
+            .form-group {
+                margin-bottom: 16px;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 10% auto;
+            }
+
+            video {
+                max-height: 240px;
+            }
+
+            .tab {
+                font-size: 16px;
+                text-align: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -308,7 +333,6 @@
         <tr>
             <th>No</th>
             <th data-field="name" class="sortable">Name <i class="fa fa-sort"></i></th>
-            <th data-field="added_date" class="sortable">Added Date<i class="fa fa-sort"></i></th>
             <th data-field="expiration" class="sortable">Expiration Date<i class="fa fa-sort"></i></th>
             <th data-field="days_left" class="sortable">Days Left <i class="fa fa-sort"></i></th>
             <th>Actions</th>
@@ -367,7 +391,7 @@
         <div id="videoContainer">
             <video id="video" autoplay></video>
             <button onclick="captureImage()" id="captureBtn">📸 Capture</button>
-            <canvas id="canvas" style="display:none;" ></canvas>
+            <canvas id="canvas" style="display:none;"></canvas>
         </div>
     </div>
 </div>
@@ -492,11 +516,10 @@
             const style = p.daysLeft >= 0 ? `style="background-color: ${bgColor};"` : "";
             tbody.innerHTML += `
             <tr class="${rowClass}" data-days="${p.daysLeft}" ${style}>
-              <td>${index + 1}</td>
-              <td class="productName">${p.name}</td>
-              <td>${p.added_date}</td>
-              <td>${p.expiration}</td>
-              <td>${p.daysLeft}</td>
+              <td data-label="No">${index + 1}</td>
+              <td data-label="Name" class="productName">${p.name}</td>
+              <td data-label="Expiration Date">${p.expiration}</td>
+              <td data-label="Days Left">${p.daysLeft}</td>
               <td class="actions">
                 <button class="btn-edit" title="Edit" onclick="editProduct(${p.id})"><i class="fa fa-pen-to-square"></i></button>
                 <button class="btn-delete" title="Delete" onclick="deleteProduct(${p.id})"><i class="fa fa-trash"></i></button>
