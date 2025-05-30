@@ -207,7 +207,6 @@
             table {
                 display: block;
                 overflow-x: auto;
-                overflow-y: auto;
                 white-space: nowrap;
             }
 
@@ -323,7 +322,7 @@
             padding-top: 56.25%; /* 16:9 aspect ratio = 9/16 * 100 */
         }
 
-        #video, #overlay {
+        #video {
             position: absolute;
             top: 0;
             left: 0;
@@ -331,11 +330,6 @@
             height: 100%;
             object-fit: cover; /* hoặc 'contain' nếu muốn toàn bộ khung hình */
             transform: rotate(0deg); /* hoặc rotate(90deg) nếu thiết bị không tự xoay */
-        }
-
-        .overlay-canvas {
-            pointer-events: auto; /* Cho phép click */
-            z-index: 2;
         }
     </style>
 </head>
@@ -411,7 +405,6 @@
         <div id="videoContainer">
             <video id="video" autoplay playsinline muted></video>
             <canvas id="canvas" style="display:none;"></canvas>
-            <canvas id="overlay" class="overlay-canvas"></canvas>
         </div>
         <button onclick="captureImage()" id="captureBtn">📸 Capture</button>
     </div>
@@ -649,11 +642,8 @@
 </script>
 
 <script>
-    let ocrInterval;
-
     // OCR logic
     function startCamera(inputId) {
-        ocrInterval = setInterval(analyzeFrame, 1500);
         openCameraPopup();
         currentInput = document.getElementById(inputId);
         //// document.getElementById("videoContainer").style.display = "block";
@@ -677,7 +667,6 @@
     }
 
     function stopCamera() {
-        clearInterval(ocrInterval);
         // document.getElementById("videoContainer").style.display = "none";
         closeCameraPopup();
         if (videoStream) {
@@ -697,7 +686,7 @@
         // stopCamera();
     }
 
-    async function captureImage() {
+    function captureImage() {
         const video = document.getElementById("video");
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
@@ -715,36 +704,21 @@
         // Get image with base64 format
         const dataURL = canvas.toDataURL("image/png");
 
-        const {createWorker} = Tesseract;
-        const worker = await createWorker({
-            logger: m => console.log(m)
-        });
-        await worker.loadLanguage('eng');
-        await worker.initialize('eng');
-
+        // Limit chars recognize
         const whitelist = currentInput.id === "expInput"
-            ? "0123456789./-:"
+            ? "0123456789./-"
             : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ";
 
-        await worker.setParameters({
-            tessedit_char_whitelist: whitelist,
-            preserve_interword_spaces: '1'
-        });
-
-        // const {data: {lines}} = await worker.recognize(dataURL).the;
-
         // Recognize text by Tesseract
-        // Tesseract.recognize(
-        //     dataURL,
-        //     'eng',
-        //     {
-        //         logger: m => console.log(m),
-        //         tessedit_char_whitelist: whitelist,
-        //         preserve_interword_spaces: 1,
-        //     }
-        // )
-
-        await worker.recognize(dataURL).then(({data: {text}}) => {
+        Tesseract.recognize(
+            dataURL,
+            'eng',
+            {
+                logger: m => console.log(m),
+                tessedit_char_whitelist: whitelist,
+                preserve_interword_spaces: 1,
+            }
+        ).then(({data: {text}}) => {
             if (currentInput.id === "expInput") {
                 // const cleaned = text.replace(/[^0-9\-./]/g, '');
                 console.log("Cleaned Expiration: ", text);
@@ -851,110 +825,6 @@
     }
 
 
-    async function analyzeFrame() {
-        const video = document.getElementById("video");
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // Preprocess image: grayscale + threshold
-        preprocess(ctx, canvas);
-
-        const dataURL = canvas.toDataURL("image/png");
-
-        const {createWorker} = Tesseract;
-        const worker = await createWorker({
-            logger: m => console.log(m)
-        });
-        await worker.loadLanguage('eng');
-        await worker.initialize('eng');
-
-        const whitelist = currentInput.id === "expInput"
-            ? "0123456789./-:"
-            : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ";
-
-        await worker.setParameters({
-            tessedit_char_whitelist: whitelist,
-            preserve_interword_spaces: '1'
-        });
-
-        const {data: {lines}} = await worker.recognize(dataURL);
-
-        console.log("lines: ", lines);
-        // console.log("words: ", words);
-
-        drawBoundingBoxes(lines, video.videoWidth, video.videoHeight);
-
-        await worker.terminate();
-    }
-
-    function drawBoundingBoxes(lines, originalWidth, originalHeight) {
-        const overlay = document.getElementById("overlay");
-        overlay.width = overlay.clientWidth;
-        overlay.height = overlay.clientHeight;
-        const ctx = overlay.getContext("2d");
-        ctx.clearRect(0, 0, overlay.width, overlay.height);
-
-        const scaleX = overlay.width / originalWidth;
-        const scaleY = overlay.height / originalHeight;
-
-        const stored = [];
-
-        lines.forEach(line => {
-            const {bbox, text} = line;
-            const x = bbox.x0 * scaleX;
-            const y = bbox.y0 * scaleY;
-            const w = (bbox.x1 - bbox.x0) * scaleX;
-            const h = (bbox.y1 - bbox.y0) * scaleY;
-
-            ctx.strokeStyle = "red";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, w, h);
-
-            ctx.font = "16px Arial";
-            ctx.fillStyle = "black";
-            ctx.fillText(text, x + 4, y - 6);
-
-            stored.push({
-                text: text.trim(),
-                box: {x, y, w, h}
-            });
-        });
-
-        window.detectedLines = stored;
-    }
-
-    document.getElementById("overlay").addEventListener("click", function (e) {
-        const rect = this.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        for (const line of window.detectedLines || []) {
-            const {x: lx, y: ly, w, h} = line.box;
-            if (x >= lx && x <= lx + w && y >= ly && y <= ly + h) {
-                if (currentInput.id === "expInput") {
-                    // const cleaned = line.text.replace(/[^0-9\-.:/]/g, '');
-                    console.log("Cleaned Expiration: ", line.text);
-                    const cleanedExpireDate = formatDateToYYYYMMDD(extractExpiry(line.text))
-                    console.log("cleanedExpireDate: ", cleanedExpireDate);
-
-                    currentInput.value = cleanedExpireDate;
-                    inputExpPicker.setDate(cleanedExpireDate);
-                } else {
-                    currentInput.value = line.text.trim().replace(/[^A-Za-z0-9 ]/g, '');
-                }
-
-                stopCamera();
-                break;
-            }
-        }
-    });
-
 </script>
-
 </body>
 </html>
