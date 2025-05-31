@@ -398,6 +398,13 @@
     <button onclick="updateProduct()">Save</button>
 </div>
 
+<!-- Camera -->
+<!--<div id="videoContainer">-->
+<!--    <video id="video" autoplay></video>-->
+<!--    <button onclick="captureImage()">📸 Capture</button>-->
+<!--    <canvas id="canvas" style="display:none;"></canvas>-->
+<!--</div>-->
+
 <div id="videoModal" class="modal popup-overlay">
     <div class="modal-content popup-content">
         <span class="close_camera-btn" onclick="stopCamera()">&times;</span>
@@ -642,8 +649,7 @@
 </script>
 
 <script>
-    let ocrInterval, dataURL;
-
+    let ocrInterval;
 
     // OCR logic
     function startCamera(inputId) {
@@ -672,7 +678,7 @@
 
     function stopCamera() {
         clearInterval(ocrInterval);
-
+        // document.getElementById("videoContainer").style.display = "none";
         closeCameraPopup();
         if (videoStream) {
             videoStream.getTracks().forEach(track => track.stop());
@@ -692,9 +698,26 @@
     }
 
     async function captureImage() {
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        // Set true canvas size
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        // Vẽ current frame into canvas
+        ctx.drawImage(video, 0, 0);
+
+        // Preprocess image: grayscale + threshold
+        preprocess(ctx, canvas);
+
+        // Get image with base64 format
+        const dataURL = canvas.toDataURL("image/png");
+
         const {createWorker} = Tesseract;
         const worker = await createWorker({
-            // logger: m => console.log(m)
+            logger: m => console.log(m)
         });
         await worker.loadLanguage('eng');
         await worker.initialize('eng');
@@ -708,7 +731,20 @@
             preserve_interword_spaces: '1'
         });
 
-        await worker.recognize(dataURL).then(({data: {lines, text}}) => {
+        // const {data: {lines}} = await worker.recognize(dataURL).the;
+
+        // Recognize text by Tesseract
+        // Tesseract.recognize(
+        //     dataURL,
+        //     'eng',
+        //     {
+        //         logger: m => console.log(m),
+        //         tessedit_char_whitelist: whitelist,
+        //         preserve_interword_spaces: 1,
+        //     }
+        // )
+
+        await worker.recognize(dataURL).then(({data: {text}}) => {
             if (currentInput.id === "expInput") {
                 // const cleaned = text.replace(/[^0-9\-./]/g, '');
                 console.log("Cleaned Expiration: ", text);
@@ -718,10 +754,7 @@
                 currentInput.value = cleanedExpireDate;
                 inputExpPicker.setDate(cleanedExpireDate);
             } else {
-                // currentInput.value = text.replace(/[^A-Za-z0-9 ]/g, '').trim();
-
-                console.log("lines: ", lines);
-                currentInput.value = extractProductNameFromLines(lines)
+                currentInput.value = text.replace(/[^A-Za-z0-9 ]/g, '');
             }
 
             stopCamera();
@@ -831,11 +864,11 @@
         // Preprocess image: grayscale + threshold
         preprocess(ctx, canvas);
 
-        dataURL = canvas.toDataURL("image/png");
+        const dataURL = canvas.toDataURL("image/png");
 
         const {createWorker} = Tesseract;
         const worker = await createWorker({
-            // logger: m => console.log(m)
+            logger: m => console.log(m)
         });
         await worker.loadLanguage('eng');
         await worker.initialize('eng');
@@ -849,49 +882,50 @@
             preserve_interword_spaces: '1'
         });
 
-        const {data: {words}} = await worker.recognize(dataURL);
+        const {data: {lines}} = await worker.recognize(dataURL);
 
-        // console.log("lines: ", lines);
+        console.log("lines: ", lines);
         // console.log("words: ", words);
 
-        drawBoundingBoxes(words, video.videoWidth, video.videoHeight);
+        drawBoundingBoxes(lines, video.videoWidth, video.videoHeight);
 
         await worker.terminate();
     }
 
-    function drawBoundingBoxes(words) {
+    function drawBoundingBoxes(lines, originalWidth, originalHeight) {
         const overlay = document.getElementById("overlay");
         overlay.width = overlay.clientWidth;
         overlay.height = overlay.clientHeight;
         const ctx = overlay.getContext("2d");
         ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-        const scaleX = overlay.width / video.videoWidth;
-        const scaleY = overlay.height / video.videoHeight;
+        const scaleX = overlay.width / originalWidth;
+        const scaleY = overlay.height / originalHeight;
 
-        const meaningfulWords = words.filter(isMeaningful);
+        const stored = [];
 
-        meaningfulWords.forEach(word => {
-            const {x0, y0, x1, y1} = word.bbox;
-            ctx.strokeStyle = "lime";
+        lines.forEach(line => {
+            const {bbox, text} = line;
+            const x = bbox.x0 * scaleX;
+            const y = bbox.y0 * scaleY;
+            const w = (bbox.x1 - bbox.x0) * scaleX;
+            const h = (bbox.y1 - bbox.y0) * scaleY;
+
+            ctx.strokeStyle = "red";
             ctx.lineWidth = 2;
-            ctx.strokeRect(x0 * scaleX, y0 * scaleY, (x1 - x0) * scaleX, (y1 - y0) * scaleY);
+            ctx.strokeRect(x, y, w, h);
 
-            ctx.fillStyle = "black";
             ctx.font = "16px Arial";
-            ctx.fillText(word.text, x0 * scaleX, y0 * scaleY - 5);
+            ctx.fillStyle = "black";
+            ctx.fillText(text, x + 4, y - 6);
+
+            stored.push({
+                text: text.trim(),
+                box: {x, y, w, h}
+            });
         });
 
-        // Store for click interaction
-        window.detectedWords = meaningfulWords.map(word => ({
-            ...word,
-            scaledBox: {
-                x: word.bbox.x0 * scaleX,
-                y: word.bbox.y0 * scaleY,
-                w: (word.bbox.x1 - word.bbox.x0) * scaleX,
-                h: (word.bbox.y1 - word.bbox.y0) * scaleY
-            }
-        }));
+        window.detectedLines = stored;
     }
 
     document.getElementById("overlay").addEventListener("click", function (e) {
@@ -899,20 +933,19 @@
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        for (const word of window.detectedWords || []) {
-            const {x: bx, y: by, w, h} = word.scaledBox;
-            if (x >= bx && x <= bx + w && y >= by && y <= by + h) {
-                // Get exp date
+        for (const line of window.detectedLines || []) {
+            const {x: lx, y: ly, w, h} = line.box;
+            if (x >= lx && x <= lx + w && y >= ly && y <= ly + h) {
                 if (currentInput.id === "expInput") {
                     // const cleaned = line.text.replace(/[^0-9\-.:/]/g, '');
-                    // console.log("Cleaned Expiration: ", word.text);
-                    const cleanedExpireDate = formatDateToYYYYMMDD(extractExpiry(word.text))
+                    console.log("Cleaned Expiration: ", line.text);
+                    const cleanedExpireDate = formatDateToYYYYMMDD(extractExpiry(line.text))
                     console.log("cleanedExpireDate: ", cleanedExpireDate);
 
                     currentInput.value = cleanedExpireDate;
                     inputExpPicker.setDate(cleanedExpireDate);
                 } else {
-                    currentInput.value = word.text.trim().replace(/[^A-Za-z0-9 ]/g, '');
+                    currentInput.value = line.text.trim().replace(/[^A-Za-z0-9 ]/g, '');
                 }
 
                 stopCamera();
@@ -920,89 +953,6 @@
             }
         }
     });
-</script>
-
-<script>
-    function extractProductNameFromLines(lines) {
-        if (!lines || lines.length === 0) return '';
-
-        const excludePattern = /(\d{2,4}[\/\-.]\d{1,2}|\d{6,}|\d{2}[:h]\d{2})/i;
-
-        const filtered = lines
-            .map(line => {
-                const cleanText = line.text.replace(/[^\w ]/g, '').replace(/\s+/g, ' ').trim();
-                const words = cleanText.split(/\s+/);
-                const meaninglessRatio = words.filter(isMeaninglessWord).length / words.length;
-                const {x0 = 0, y0 = 0, x1 = 0, y1 = 0} = line.bbox || {};
-                const width = x1 - x0;
-                const height = y1 - y0;
-                const area = width * height;
-
-                // console.log("meaninglessRatio: ", meaninglessRatio);
-                // console.log("cleanText: ", cleanText);
-                // console.log("words: ", words);
-
-                return {
-                    text: cleanText,
-                    length: cleanText.length,
-                    confidence: line.confidence,
-                    width,
-                    height,
-                    area,
-                    raw: line,
-                    meaninglessRatio
-                };
-            })
-            .filter(line =>
-                !excludePattern.test(line.text) &&      // Không chứa ngày, mã
-                line.text.match(/[A-Za-z]/) &&          // Có chữ cái
-                line.confidence > 0 &&                   // Tin cậy
-                line.meaninglessRatio < 0.7
-            );
-
-        if (filtered.length === 0) return '';
-
-        // Ưu tiên dòng có bounding box lớn nhất (diện tích lớn nhất)
-        filtered.sort((a, b) => {
-            if (b.height === a.height) {
-                if (b.length === a.length) return b.confidence - a.confidence;
-                return b.length - a.length;
-            }
-            return b.height - a.height;
-        });
-
-        return filtered[0].text;
-    }
-
-    function isMeaninglessWord(word) {
-        if (!word) return true;
-        const letters = word.replace(/[^a-zA-Z]/g, '');
-        return word.length <= 2 || letters.length < 2;
-    }
-
-    function isMeaningful(word) {
-        const text = word.text.trim();
-        if (currentInput.id === "expInput") {
-            const patterns = [
-                /\b(20\d{2})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})\b/,    // yyyy-mm-dd
-                /\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](20\d{2})\b/,    // dd-mm-yyyy
-                /\b(\d{1,2})[\/\-\.](20\d{2})\b/,                     // mm-yyyy
-                /\b(20\d{2})[\/\-\.](\d{1,2})\b/,                     // yyyy-mm
-                /\b(\d{2})[\/\-\.](\d{2})\b/,                         // mm/yy hoặc yy/mm
-            ];
-
-            for (let pattern of patterns) {
-                const match = text.match(pattern);
-                if (match) return true;
-            }
-        }
-
-        if (text.length < 2) return false;
-        if (!/[A-Za-z]/.test(text)) return false;
-
-        // exclude noise char
-        return !/^\d+$/.test(text);
-    }
 
 </script>
 
